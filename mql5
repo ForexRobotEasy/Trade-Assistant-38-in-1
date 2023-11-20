@@ -1,0 +1,120 @@
+mql5
+// Trade Assistant 38 in 1
+// Developer's site: forexroboteasy.com
+// Development: Forex Robot Easy Team
+
+// Lot Calculator function
+double CalculateLot(double riskSize, double stopLoss)
+{
+    double accountBalance = AccountBalance();
+    double lotSize = (accountBalance * riskSize) / stopLoss;
+    return NormalizeDouble(lotSize, Digits);
+}
+
+// Risk Calculator function
+double CalculateRisk(double lotSize, double stopLoss)
+{
+    double accountBalance = AccountBalance();
+    double riskAmount = (lotSize * stopLoss) / accountBalance;
+    return NormalizeDouble(riskAmount, Digits);
+}
+
+// Risk/Reward Ratio function
+double CalculateRR(double takeProfit, double stopLoss)
+{
+    double rr = takeProfit / stopLoss;
+    return NormalizeDouble(rr, Digits);
+}
+
+// Activation triggers for orders
+void SetBuyStopLimit(double price, double stopLoss, double takeProfit)
+{
+    double sl = price - stopLoss;
+    double tp = price + takeProfit;
+    OrderSend(Symbol(), OP_BUYSTOP, lotSize, price, 0, sl, tp);
+}
+
+void SetSellStopLimit(double price, double stopLoss, double takeProfit)
+{
+    double sl = price + stopLoss;
+    double tp = price - takeProfit;
+    OrderSend(Symbol(), OP_SELLSTOP, lotSize, price, 0, sl, tp);
+}
+
+// Virtual Stop Loss/Take Profit levels
+void SetVirtualSL(double price, double stopLoss)
+{
+    double sl = price - stopLoss;
+    OrderModify(OrderTicket(), OrderOpenPrice(), sl, OrderTakeProfit(), 0, clrNONE);
+}
+
+void SetVirtualTP(double price, double takeProfit)
+{
+    double tp = price + takeProfit;
+    OrderModify(OrderTicket(), OrderOpenPrice(), OrderStopLoss(), tp, 0, clrNONE);
+}
+
+// Smart SL/Entry levels
+void SetSmartSL(double price, double stopLoss)
+{
+    double sl = price - stopLoss;
+    double currentClose = Close[0];
+    if (sl < currentClose)
+    {
+        sl = currentClose;
+    }
+    OrderModify(OrderTicket(), OrderOpenPrice(), sl, OrderTakeProfit(), 0, clrNONE);
+}
+
+// Hidden Pending Orders
+void PlaceHiddenOrder(int type, double price, double stopLoss, double takeProfit)
+{
+    double sl = price - stopLoss;
+    double tp = price + takeProfit;
+    int magicNumber = 123456; // unique identifier for the order
+    int expiration = 0; // order never expires
+    int arrowColor = clrNONE; // no arrow symbol
+    int result = OrderSend(Symbol(), type, lotSize, price, 0, sl, tp, 'Hidden Order', magicNumber, expiration, arrowColor);
+    if (result == -1)
+        Print('Error placing hidden order: ', GetLastError());
+}
+
+// Scheduled Pending Orders
+void PlaceScheduledOrder(int type, double price, double stopLoss, double takeProfit, datetime expirationTime)
+{
+    double sl = price - stopLoss;
+    double tp = price + takeProfit;
+    int magicNumber = 123456; // unique identifier for the order
+    int arrowColor = clrNONE; // no arrow symbol
+    int result = OrderSend(Symbol(), type, lotSize, price, 0, sl, tp, 'Scheduled Order', magicNumber, expirationTime, arrowColor);
+    if (result == -1)
+        Print('Error placing scheduled order: ', GetLastError());
+}
+
+// Usage example
+void OnStart()
+{
+    double riskSize = 0.02; // 2% risk
+    double stopLoss = 100; // 100 pips
+    double takeProfit = 200; // 200 pips
+    double price = SymbolInfoDouble(_Symbol, SYMBOL_ASK); // current ask price
+
+    double lotSize = CalculateLot(riskSize, stopLoss);
+    double riskAmount = CalculateRisk(lotSize, stopLoss);
+    double rr = CalculateRR(takeProfit, stopLoss);
+
+    SetBuyStopLimit(price, stopLoss, takeProfit);
+    SetSellStopLimit(price, stopLoss, takeProfit);
+
+    SetVirtualSL(price, stopLoss);
+    SetVirtualTP(price, takeProfit);
+
+    SetSmartSL(price, stopLoss);
+
+    PlaceHiddenOrder(OP_BUYSTOP, price, stopLoss, takeProfit);
+    PlaceHiddenOrder(OP_SELLSTOP, price, stopLoss, takeProfit);
+
+    datetime expirationTime = D'2022.01.01 00:00:00'; // example expiration time
+    PlaceScheduledOrder(OP_BUYSTOP, price, stopLoss, takeProfit, expirationTime);
+    PlaceScheduledOrder(OP_SELLSTOP, price, stopLoss, takeProfit, expirationTime);
+}
